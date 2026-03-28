@@ -5,6 +5,7 @@ description = "Optimize a small GPT from scratch — helix edition of karpathy/a
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "helices[claude]>=0.1.1",
     "numpy>=2.0.0",
     "pyarrow>=18.0.0",
     "requests>=2.32.0",
