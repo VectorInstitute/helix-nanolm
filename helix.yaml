@@ -1,0 +1,30 @@
+name: helix-nanolm
+version: 1.0.0
+domain: AI/ML
+description: >
+  Optimize a small GPT model trained from scratch on karpathy/climbmix-400b-shuffle.
+  Minimize validation bits per byte (val_bpb) within a fixed 5-minute training budget.
+
+scope:
+  editable:
+    - train.py
+  readonly:
+    - prepare.py
+    - helix.yaml
+    - program.md
+    - pyproject.toml
+
+metrics:
+  primary:
+    name: val_bpb
+    optimize: minimize
+  evaluate:
+    command: uv run train.py
+    timeout_seconds: 600
+    output_format: pattern
+    patterns:
+      primary: '^val_bpb:\s+([\d.]+)'
+
+requirements:
+  python: ">=3.10"
+  gpu: "CUDA GPU required (tested on H100)"
