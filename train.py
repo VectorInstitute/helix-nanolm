@@ -505,6 +505,12 @@ print(f"Using device: {device}")
 autocast_ctx = torch.amp.autocast(device_type=device.type, dtype=torch.bfloat16)
 H100_BF16_PEAK_FLOPS = 989.5e12  # used for MFU display on CUDA; not applicable on other devices
 
+# Reduce batch size on non-CUDA devices — H100 default (128) causes OOM on MPS/CPU
+if device.type == "mps":
+    DEVICE_BATCH_SIZE = min(DEVICE_BATCH_SIZE, 4)
+elif device.type == "cpu":
+    DEVICE_BATCH_SIZE = min(DEVICE_BATCH_SIZE, 2)
+
 
 def sync():
     """Device-agnostic synchronization for accurate timing."""
