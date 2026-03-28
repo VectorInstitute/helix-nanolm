@@ -3,22 +3,11 @@ name = "helix-nanolm"
 version = "0.1.0"
 description = "Optimize a small GPT from scratch — helix edition of karpathy/autoresearch"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-    "kernels>=0.11.7",
-    "pyarrow>=21.0.0",
+    "pyarrow>=18.0.0",
     "requests>=2.32.0",
     "rustbpe>=0.1.0",
-    "tiktoken>=0.11.0",
-    "torch==2.9.1",
+    "tiktoken>=0.8.0",
+    "torch>=2.5.0",
 ]
-
-[tool.uv.sources]
-torch = [
-    { index = "pytorch-cu128" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true

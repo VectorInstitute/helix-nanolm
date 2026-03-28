@@ -16,6 +16,11 @@ uv run prepare.py   # one-time: download data shards + train tokenizer (~10 shar
 helix run
 ```
 
+**CUDA users:** install PyTorch with CUDA support before `uv sync`:
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+```
+
 ## Metric
 
 **Primary: `val_bpb` (minimize)** — Vocabulary-size-independent validation bits per byte, evaluated on a pinned held-out shard.
@@ -26,7 +31,7 @@ The agent may only modify `train.py`. All other files are read-only.
 
 ## Hardware
 
-Requires a CUDA GPU. Originally developed on an H100.
+Runs on CUDA (tested on H100), Apple Silicon (MPS), or CPU. CUDA is strongly recommended for actual research — Mac/CPU runs are slow but useful for development.
 
 ---
 
