@@ -483,7 +483,7 @@ FINAL_LR_FRAC = 0.0     # final LR as fraction of initial
 
 # Model size
 DEPTH = 8               # number of transformer layers
-DEVICE_BATCH_SIZE = 128  # per-device batch size (reduce if OOM)
+DEVICE_BATCH_SIZE = 32   # per-device batch size (reduce if OOM)
 
 # ---------------------------------------------------------------------------
 # Setup: device, tokenizer, model, optimizer, dataloader
@@ -500,7 +500,7 @@ autocast_ctx = torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16)
 
 # BF16 peak FLOPS for the target GPU — used only for MFU display, does not affect training
 # Update this for your GPU: H100 SXM5=989.5e12, A100=312e12, L40=181e12, etc.
-GPU_PEAK_FLOPS_BF16 = 989.5e12
+GPU_PEAK_FLOPS_BF16 = 120e12  # L4 GPU
 
 tokenizer = Tokenizer.from_directory()
 vocab_size = tokenizer.get_vocab_size()
