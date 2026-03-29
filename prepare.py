@@ -245,7 +245,7 @@ class Tokenizer:
         return self.enc.decode(ids)
 
 
-def get_token_bytes(device="cpu"):
+def get_token_bytes(device="cuda"):
     path = os.path.join(TOKENIZER_DIR, "token_bytes.pt")
     with open(path, "rb") as f:
         return torch.load(f, map_location=device)
@@ -273,20 +273,13 @@ def _document_batches(split, tokenizer_batch_size=128):
         epoch += 1
 
 
-def make_dataloader(tokenizer, B, T, split, buffer_size=1000, device=None):
+def make_dataloader(tokenizer, B, T, split, buffer_size=1000):
     """
     BOS-aligned dataloader with best-fit packing.
     Every row starts with BOS. Documents packed using best-fit to minimize cropping.
     When no document fits remaining space, crops shortest doc to fill exactly.
     100% utilization (no padding).
     """
-    if device is None:
-        if torch.cuda.is_available():
-            device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            device = torch.device("mps")
-        else:
-            device = torch.device("cpu")
     assert split in ["train", "val"]
     row_capacity = T + 1
     batches = _document_batches(split)
@@ -301,10 +294,9 @@ def make_dataloader(tokenizer, B, T, split, buffer_size=1000, device=None):
         doc_buffer.extend(token_lists)
 
     # Pre-allocate buffers: [inputs (B*T) | targets (B*T)]
-    pin = device.type == "cuda"
     row_buffer = torch.empty((B, row_capacity), dtype=torch.long)
-    cpu_buffer = torch.empty(2 * B * T, dtype=torch.long, pin_memory=pin)
-    gpu_buffer = torch.empty(2 * B * T, dtype=torch.long, device=device)
+    cpu_buffer = torch.empty(2 * B * T, dtype=torch.long, pin_memory=True)
+    gpu_buffer = torch.empty(2 * B * T, dtype=torch.long, device="cuda")
     cpu_inputs = cpu_buffer[:B * T].view(B, T)
     cpu_targets = cpu_buffer[B * T:].view(B, T)
     inputs = gpu_buffer[:B * T].view(B, T)
@@ -357,9 +349,8 @@ def evaluate_bpb(model, tokenizer, batch_size):
     are excluded from both sums.
     Uses fixed MAX_SEQ_LEN so results are comparable across configs.
     """
-    dev = next(model.parameters()).device
-    token_bytes = get_token_bytes(device=str(dev))
-    val_loader = make_dataloader(tokenizer, batch_size, MAX_SEQ_LEN, "val", device=dev)
+    token_bytes = get_token_bytes(device="cuda")
+    val_loader = make_dataloader(tokenizer, batch_size, MAX_SEQ_LEN, "val")
     steps = EVAL_TOKENS // (batch_size * MAX_SEQ_LEN)
     total_nats = 0.0
     total_bytes = 0

@@ -471,13 +471,13 @@ WINDOW_PATTERN = "SSSL" # sliding window pattern: L=full, S=half context
 
 # Optimization
 TOTAL_BATCH_SIZE = 2**19 # ~524K tokens per optimizer step
-EMBEDDING_LR = 0.6      # learning rate for token embeddings (Adam)
-UNEMBEDDING_LR = 0.004  # learning rate for lm_head (Adam)
-MATRIX_LR = 0.04        # learning rate for matrix parameters (Muon)
-SCALAR_LR = 0.5         # learning rate for per-layer scalars (Adam)
-WEIGHT_DECAY = 0.2      # cautious weight decay for Muon
+EMBEDDING_LR = 0.3      # learning rate for token embeddings (Adam)
+UNEMBEDDING_LR = 0.002  # learning rate for lm_head (Adam)
+MATRIX_LR = 0.02        # learning rate for matrix parameters (Muon)
+SCALAR_LR = 0.3         # learning rate for per-layer scalars (Adam)
+WEIGHT_DECAY = 0.1      # cautious weight decay for Muon
 ADAM_BETAS = (0.8, 0.95) # Adam beta1, beta2
-WARMUP_RATIO = 0.0      # fraction of time budget for LR warmup
+WARMUP_RATIO = 0.05     # fraction of time budget for LR warmup
 WARMDOWN_RATIO = 0.5    # fraction of time budget for LR warmdown
 FINAL_LR_FRAC = 0.0     # final LR as fraction of initial
 
@@ -493,32 +493,14 @@ t_start = time.time()
 torch.manual_seed(42)
 torch.set_float32_matmul_precision("high")
 
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-    torch.cuda.manual_seed(42)
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
+assert torch.cuda.is_available(), "CUDA is required"
+device = torch.device("cuda")
+torch.cuda.manual_seed(42)
+autocast_ctx = torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16)
 
-print(f"Using device: {device}")
-autocast_ctx = torch.amp.autocast(device_type=device.type, dtype=torch.bfloat16)
-H100_BF16_PEAK_FLOPS = 989.5e12  # used for MFU display on CUDA; not applicable on other devices
-
-# Reduce batch size on non-CUDA devices — H100 default (128) causes OOM on MPS/CPU
-if device.type == "mps":
-    DEVICE_BATCH_SIZE = min(DEVICE_BATCH_SIZE, 4)
-elif device.type == "cpu":
-    DEVICE_BATCH_SIZE = min(DEVICE_BATCH_SIZE, 2)
-
-
-def sync():
-    """Device-agnostic synchronization for accurate timing."""
-    if device.type == "cuda":
-        torch.cuda.synchronize()
-    elif device.type == "mps":
-        torch.mps.synchronize()
-
+# BF16 peak FLOPS for the target GPU — used only for MFU display, does not affect training
+# Update this for your GPU: H100 SXM5=989.5e12, A100=312e12, L40=181e12, etc.
+GPU_PEAK_FLOPS_BF16 = 989.5e12
 
 tokenizer = Tokenizer.from_directory()
 vocab_size = tokenizer.get_vocab_size()
@@ -563,10 +545,9 @@ optimizer = model.setup_optimizer(
     weight_decay=WEIGHT_DECAY,
 )
 
-if device.type == "cuda":
-    model = torch.compile(model, dynamic=False)
+model = torch.compile(model, dynamic=False)
 
-train_loader = make_dataloader(tokenizer, DEVICE_BATCH_SIZE, MAX_SEQ_LEN, "train", device=device)
+train_loader = make_dataloader(tokenizer, DEVICE_BATCH_SIZE, MAX_SEQ_LEN, "train")
 x, y, epoch = next(train_loader)  # prefetch first batch
 
 print(f"Time budget: {TIME_BUDGET}s")
@@ -600,7 +581,7 @@ total_training_time = 0
 step = 0
 
 while True:
-    sync()
+    torch.cuda.synchronize()
     t0 = time.time()
     for micro_step in range(grad_accum_steps):
         with autocast_ctx:
@@ -630,7 +611,7 @@ while True:
         print("FAIL")
         exit(1)
 
-    sync()
+    torch.cuda.synchronize()
     t1 = time.time()
     dt = t1 - t0
 
@@ -643,7 +624,7 @@ while True:
     debiased_smooth_loss = smooth_train_loss / (1 - ema_beta**(step + 1))
     pct_done = 100 * progress
     tok_per_sec = int(TOTAL_BATCH_SIZE / dt)
-    mfu = 100 * num_flops_per_token * TOTAL_BATCH_SIZE / dt / H100_BF16_PEAK_FLOPS
+    mfu = 100 * num_flops_per_token * TOTAL_BATCH_SIZE / dt / GPU_PEAK_FLOPS_BF16
     remaining = max(0, TIME_BUDGET - total_training_time)
 
     print(f"\rstep {step:05d} ({pct_done:.1f}%) | loss: {debiased_smooth_loss:.6f} | lrm: {lrm:.2f} | dt: {dt*1000:.0f}ms | tok/sec: {tok_per_sec:,} | mfu: {mfu:.1f}% | epoch: {epoch} | remaining: {remaining:.0f}s    ", end="", flush=True)
@@ -673,14 +654,9 @@ with autocast_ctx:
 
 # Final summary
 t_end = time.time()
-steady_state_mfu = 100 * num_flops_per_token * TOTAL_BATCH_SIZE * (step - 10) / total_training_time / H100_BF16_PEAK_FLOPS if total_training_time > 0 else 0
+steady_state_mfu = 100 * num_flops_per_token * TOTAL_BATCH_SIZE * (step - 10) / total_training_time / GPU_PEAK_FLOPS_BF16 if total_training_time > 0 else 0
 
-if device.type == "cuda":
-    peak_vram_mb = torch.cuda.max_memory_allocated() / 1024 / 1024
-elif device.type == "mps":
-    peak_vram_mb = torch.mps.current_allocated_memory() / 1024 / 1024
-else:
-    peak_vram_mb = 0.0
+peak_vram_mb = torch.cuda.max_memory_allocated() / 1024 / 1024
 
 print("---")
 print(f"val_bpb:          {val_bpb:.6f}")
