@@ -1,0 +1,2 @@
+session	commit	val_bpb	quality_guard	status	description
+mar28	29b38e9	1.548048		keep	exp1: depth=4, batch=8K, reduced LRs for MPS
