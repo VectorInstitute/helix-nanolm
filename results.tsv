@@ -1,0 +1,27 @@
+commit	val_bpb	status	description
+97e0341	1.866523	keep	baseline: batch32 on L4
+44d8733	1.527875	keep	total_batch=131K, grad_accum=2, 177 steps
+b2d4a4b	1.292743	keep	total_batch=65K grad_accum=1, matrix_lr=0.015, 340 steps
+4999e98	1.396933	discard	SwiGLU MLP (worse)
+8025b08	1.227420	keep	aspect_ratio=48 dim=384, 33M params, 541 steps
+b5f8330	1.204887	keep	aspect_ratio=32 dim=256, 19M params, 866 steps
+6d51f3e	1.204913	discard	aspect_ratio=24 but rounded to same dim=256
+0939a53	1.268375	discard	depth=12 HEAD_DIM=64 dim=384 (too big)
+c6a9381	1.211120	discard	depth=10 dim=256 HEAD_DIM=64 (slightly worse)
+c94f588	1.201939	keep	warmdown=0.3, matrix_lr=0.02
+f66c8bf	1.201967	discard	higher LRs (no improvement)
+97c1812	1.229672	discard	no value embeddings (worse quality)
+85f8b94	1.196902	keep	HEAD_DIM=64, 4 heads, 974 steps
+0bf2861	1.266915	discard	HEAD_DIM=32 (too many heads, worse)
+9a75653	1.200172	discard	cosine warmdown (slightly worse)
+db8eb91	1.168131	keep	all global attention, 1373 steps
+015df78	1.171008	discard	softcap=30 (slightly worse)
+e0df831	1.175873	discard	dim=320 (bigger but fewer steps)
+da11810	1.162755	keep	batch=32K, device_batch=16, 2772 steps
+59a1c4a	1.166482	discard	batch=16K too small
+ac722f4	1.162190	keep	warmdown=0.5
+c8cd7f8	1.162797	discard	warmdown=0.7 (slightly worse)
+3f49e24	1.163985	discard	no weight decay (slightly worse)
+aea5235	1.168975	discard	GQA n_kv=n_head/2 (worse quality)
+3901ef1	1.164613	discard	no softcap (slightly worse)
+f4dbefa	1.159973	keep	depth=6, dim=320, 20.5M params, 2512 steps
